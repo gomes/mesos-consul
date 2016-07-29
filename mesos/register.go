@@ -15,14 +15,14 @@ import (
 // to initialize the cache.
 //
 // All services created by mesos-consul are prefixed
-// with `mesos-consul:`
+// with service-id-prefix flag, followed by a colon.
 //
 func (m *Mesos) LoadCache() error {
 	log.Debug("Populating cache from Consul")
 
 	mh := m.getLeader()
 
-	return m.Registry.CacheLoad(mh.Ip)
+	return m.Registry.CacheLoad(mh.Ip, m.ServiceIdPrefix)
 }
 
 func (m *Mesos) RegisterHosts(s state.State) {
@@ -38,7 +38,7 @@ func (m *Mesos) RegisterHosts(s state.State) {
 		m.Agents[f.ID] = agent
 
 		m.registerHost(&registry.Service{
-			ID:      fmt.Sprintf("mesos-consul:%s:%s:%s", m.ServiceName, f.ID, f.Hostname),
+			ID:      fmt.Sprintf("%s:%s:%s:%s", m.ServiceIdPrefix, m.ServiceName, f.ID, f.Hostname),
 			Name:    m.ServiceName,
 			Port:    port,
 			Address: agent,
@@ -62,7 +62,7 @@ func (m *Mesos) RegisterHosts(s state.State) {
 			tags = m.agentTags("master")
 		}
 		s := &registry.Service{
-			ID:      fmt.Sprintf("mesos-consul:%s:%s:%s", m.ServiceName, ma.Ip, ma.PortString),
+			ID:      fmt.Sprintf("%s:%s:%s:%s", m.ServiceIdPrefix, m.ServiceName, ma.Ip, ma.PortString),
 			Name:    m.ServiceName,
 			Port:    ma.Port,
 			Address: ma.Ip,
@@ -102,8 +102,10 @@ func (m *Mesos) registerHost(s *registry.Service) {
 func (m *Mesos) registerTask(t *state.Task, agent string) {
 	var tags []string
 
+	registered := false
+
 	tname := cleanName(t.Name, m.Separator)
-        log.Debugf("original TaskName : (%v)", tname)
+	log.Debugf("original TaskName : (%v)", tname)
 	if t.Label("overrideTaskName") != "" {
 		tname = cleanName(t.Label("overrideTaskName"), m.Separator)
 		log.Debugf("overrideTaskName to : (%v)", tname)
@@ -125,6 +127,7 @@ func (m *Mesos) registerTask(t *state.Task, agent string) {
 	tags = buildRegisterTaskTags(tname, tags, m.taskTag)
 
 	for key := range t.DiscoveryInfo.Ports.DiscoveryPorts {
+		var porttags []string
 		discoveryPort := state.DiscoveryPort(t.DiscoveryInfo.Ports.DiscoveryPorts[key])
 		serviceName := discoveryPort.Name
 		servicePort := strconv.Itoa(discoveryPort.Number)
@@ -132,26 +135,33 @@ func (m *Mesos) registerTask(t *state.Task, agent string) {
 			t.Name,
 			discoveryPort.Name,
 			discoveryPort.Number)
+		pl := discoveryPort.Label("tags")
+		if pl != "" {
+			porttags = strings.Split(discoveryPort.Label("tags"), ",")
+		} else {
+			porttags = []string{}
+		}
 		if discoveryPort.Name != "" {
 			m.Registry.Register(&registry.Service{
-				ID:      fmt.Sprintf("mesos-consul:%s:%s:%d", agent, tname, discoveryPort.Number),
+				ID:      fmt.Sprintf("%s:%s:%s:%s:%d", m.ServiceIdPrefix, agent, tname, address, discoveryPort.Number),
 				Name:    tname,
 				Port:    toPort(servicePort),
 				Address: address,
-				Tags:    append(tags, serviceName),
+				Tags:    append(append(tags, serviceName), porttags...),
 				Check: GetCheck(t, &CheckVar{
 					Host: toIP(address),
 					Port: servicePort,
 				}),
 				Agent: toIP(agent),
 			})
+			registered = true
 		}
 	}
 
 	if t.Resources.PortRanges != "" {
 		for _, port := range t.Resources.Ports() {
 			m.Registry.Register(&registry.Service{
-				ID:      fmt.Sprintf("mesos-consul:%s:%s:%s", agent, tname, port),
+				ID:      fmt.Sprintf("%s:%s:%s:%s:%s", m.ServiceIdPrefix, agent, tname, address, port),
 				Name:    tname,
 				Port:    toPort(port),
 				Address: address,
@@ -162,10 +172,13 @@ func (m *Mesos) registerTask(t *state.Task, agent string) {
 				}),
 				Agent: toIP(agent),
 			})
+			registered = true
 		}
-	} else {
+	}
+
+	if !registered {
 		m.Registry.Register(&registry.Service{
-			ID:      fmt.Sprintf("mesos-consul:%s-%s", agent, tname),
+			ID:      fmt.Sprintf("%s:%s-%s:%s", m.ServiceIdPrefix, agent, tname, address),
 			Name:    tname,
 			Address: address,
 			Tags:    tags,
