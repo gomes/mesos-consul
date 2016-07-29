@@ -78,3 +78,29 @@ func toPort(p string) int {
 
 	return ps
 }
+
+// Golang regexp module does not support /(?!\\),/ syntax for spliting by not escaped comma
+// Then this function is reproducing it
+func recParseEscapedComma(str string) []string {
+	if len(str) == 0 {
+		return []string{}
+	} else if str[0] == ',' {
+		return recParseEscapedComma(str[1:])
+	}
+
+	offset := 0
+	for len(str[offset:]) > 0 {
+		index := strings.Index(str[offset:], ",")
+
+		if index == -1 {
+			break
+		} else if str[offset+index-1:offset+index] != "\\" {
+			return append(recParseEscapedComma(str[offset+index+1:]), str[:offset+index])
+		}
+
+		str = str[:offset+index-1] + str[offset+index:]
+		offset += index
+	}
+
+	return []string{str}
+}

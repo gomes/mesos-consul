@@ -85,7 +85,7 @@ func New(c *config.Config) *Mesos {
 	log.Debugf("m.IpOrder = '%v'", m.IpOrder)
 
 	if c.ServiceTags != "" {
-		m.ServiceTags = strings.Split(c.ServiceTags, ",")
+		m.ServiceTags = recParseEscapedComma(c.ServiceTags)
 	}
 
 	m.ServiceIdPrefix = c.ServiceIdPrefix

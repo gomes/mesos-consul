@@ -164,6 +164,14 @@ This will result in a service `tagging-test` being created in consul with 3 sepa
   }
 ]
 ```
+
+The comma can be escaped by adding a backslash, such as the following example:
+```
+    $ docker run -d --name redis.0 -p 10000:6379 \
+        -e "SERVICE_NAME=db" \
+        -e "SERVICE_TAGS=/(;\\,:-_)/" \
+        -e "SERVICE_REGION=us2" progrium/redis
+```
 #### Override Task Name
 
 By adding a label `overrideTaskName` with an arbitrary value, the value is used as the service name during consul registration.

@@ -1,6 +1,8 @@
 package mesos
 
 import (
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -48,6 +50,59 @@ func TestSliceContainsString(t *testing.T) {
 		r := sliceContainsString(tt.s, tt.b)
 		if r != tt.r {
 			t.Errorf("sliceContainsString(%v, %s) => %t, want %t", tt.s, tt.b, r, tt.r)
+		}
+	}
+}
+
+func TestEscapedComma(t *testing.T) {
+	cases := []struct {
+		Tag      string
+		Expected []string
+	}{
+		{
+			Tag:      "",
+			Expected: []string{},
+		},
+		{
+			Tag:      "foobar",
+			Expected: []string{"foobar"},
+		},
+		{
+			Tag:      "foo,bar",
+			Expected: []string{"foo", "bar"},
+		},
+		{
+			Tag:      "foo\\,bar",
+			Expected: []string{"foo,bar"},
+		},
+		{
+			Tag:      "foo,bar\\,baz",
+			Expected: []string{"foo", "bar,baz"},
+		},
+		{
+			Tag:      "\\,foobar\\,",
+			Expected: []string{",foobar,"},
+		},
+		{
+			Tag:      ",,,,foo,,,bar,,,",
+			Expected: []string{"foo", "bar"},
+		},
+		{
+			Tag:      ",,,,",
+			Expected: []string{},
+		},
+		{
+			Tag:      ",,\\,,",
+			Expected: []string{","},
+		},
+	}
+
+	for _, c := range cases {
+		results := recParseEscapedComma(c.Tag)
+		sort.Strings(c.Expected)
+		sort.Strings(results)
+		if !sliceEq(results, c.Expected) {
+			t.Error("Expected [" + strings.Join(c.Expected, ",") + "] but result was [" + strings.Join(results, ",") + "]")
 		}
 	}
 }
