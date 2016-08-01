@@ -106,7 +106,7 @@ func buildTaskTag(taskTag []string) (map[string][]string, error) {
 
 		taskName := strings.ToLower(parts[0])
 		log.WithField("task-tag", taskName).Debug("Using task-tag pattern")
-		tags := strings.Split(parts[1], ",")
+		tags := recParseEscapedComma(parts[1])
 
 		if _, ok := result[taskName]; !ok {
 			result[taskName] = tags

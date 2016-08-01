@@ -119,7 +119,7 @@ func (m *Mesos) registerTask(t *state.Task, agent string) {
 
 	l := t.Label("tags")
 	if l != "" {
-		tags = strings.Split(t.Label("tags"), ",")
+		tags = recParseEscapedComma(t.Label("tags"))
 	} else {
 		tags = []string{}
 	}
